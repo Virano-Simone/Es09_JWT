@@ -284,7 +284,7 @@ app.post("/api/sendMail", async function (req: any, res, next) {
     })
     const collection = client.db(dbName).collection("mails");
     const cmd = collection.updateOne({ username: mailReciver },
-        { $addToSet: { mail: { "from": sender, "subject": mailSubject, "mail": mailMessage } } });
+        { $addToSet: { mail: { "from": sender, "subject": mailSubject, "body": mailMessage } } });
     cmd.then(function (data) {
         if (data.modifiedCount > 0)
             res.send({ ok: 1 });
@@ -345,6 +345,21 @@ function sendGmail(email: any, password: string) {
     let message = fs.readFileSync("./message.html", "utf8");
     message = message.replace("__user", email);
     message = message.replace("__password", password);
-    const transporter = nodemailer.createTransport({ service: "gmail", auth: googleOAuth })
+    const transporter = nodemailer.createTransport({ service: "gmail", auth: googleOAuth });
+    const mailOptions = {
+        from: googleOAuth.user,
+        to: email,
+        subject: "Nuovo account Rilievi e Perizie",
+        html: message,
+        attachments: [{ filename: "qrCode.png", path: "./qrCode.png" }]
+    };
+    transporter.sendMail(mailOptions, function (err: any, info: any) {
+        if (err)
+            console.log(err.stack);
+        else {
+            console.log(info);
+            transporter.close();
+        }
+    })
 }
 

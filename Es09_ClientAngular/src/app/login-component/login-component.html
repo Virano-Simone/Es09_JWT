@@ -27,7 +27,6 @@
                         </span>
                         <input type="text" class="form-control" name="username" placeholder="Username"
                             [(ngModel)]="txtUsername" #txtUsernameCtrl="ngModel" required
-                            pattern="^[a-zA-Z]{4,20}@gmail.com$"
                             [class.red]="txtUsernameCtrl.touched && txtUsernameCtrl.invalid">
                     </div>
                     @if(txtUsernameCtrl.touched && txtUsernameCtrl.invalid && txtUsernameCtrl.errors?.['required']){
@@ -37,7 +36,6 @@
                     }
                     @if(txtUsernameCtrl.touched && txtUsernameCtrl.invalid && txtUsernameCtrl.errors?.['pattern']){
                     <small>
-                        Username deve terminate con @gmail.com
                     </small>
                     }
                 </div>
