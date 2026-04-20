@@ -10,6 +10,7 @@ import cors from "cors"
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken"
 import cookieParser from "cookie-parser";
+import nodemailer from "nodemailer"
 
 
 //B. configurazioni
@@ -25,6 +26,7 @@ const connectionString = process.env.connectionStringLocal;
 const dbName = process.env.dbName;
 const PORT = parseInt(process.env.PORT!);
 const HTTPS_PORT = parseInt(process.env.HTTPS_PORT!);
+const googleOAuth = JSON.parse(process.env.googleOAuth!);
 
 //C. creazione ed avvio del server HTTP
 const server = http.createServer(app);
@@ -150,23 +152,69 @@ app.post("/api/login", async function (req, res, next) {
     })
 })
 
-//2. Inserimento di un nuovo utente
+//2. Login with google
+app.post("/api/loginWithGoogle", async function (req, res, next) {
+    const googleToken: any = req.body.googleToken;
+    const payloadGoogleToken: any = jwt.decode(googleToken);
+    console.log("Google Token", payloadGoogleToken);
+    const client = new MongoClient(connectionString!);
+    await client.connect().catch(function (err) {
+        res.status(503).send("Errore di connessione al Database");
+        return;
+    });
+    const collection = client.db(dbName).collection("mails");
+    const cmd = collection.findOne({ username: payloadGoogleToken.email });
+    cmd.catch(function (err) {
+        res.status(500).send("Errore esecuzione query: " + err);
+        client.close();
+    });
+    cmd.then(function (dbUser) {
+        if (!dbUser) {
+            let password = "";
+            for (let i = 0; i < 12; i++) {
+                password += String.fromCharCode(Math.floor(Math.random() * 26) + 65);
+            }
+
+            const newUser: any = {
+                username: payloadGoogleToken.email,
+                password: bcrypt.hashSync(password, 10),
+                oldPassword: password,
+                mail: []
+            }
+            const cmd2 = collection.insertOne(newUser);
+            cmd2.catch(function (err) {
+                res.status(500).send("Errore esecuzione query: " + err);
+            });
+            cmd2.then(function (mongoResponse) {
+                newUser._id = mongoResponse.insertedId.toString();
+                sendGmail(payloadGoogleToken.email, password)
+
+                const TOKEN = createToken(newUser);
+                res.cookie("TOKEN", TOKEN, cookiesOptions);
+                res.send({ username: payloadGoogleToken.email })
+            })
+            cmd2.finally(function () {
+                client.close();
+            })
+        }
+        else {
+            let TOKEN = createToken(dbUser);
+            res.cookie("TOKEN", TOKEN, cookiesOptions);
+            res.send({ username: payloadGoogleToken.email })
+        }
+    })
+
+
+});
+
+
+//3. Inserimento di un nuovo utente
 
 
 
 
-
-//3. Logout
-app.post("/api/logout", async function (req, res, next) {
-    const options = {
-        ...cookiesOptions, maxAge: -1
-    };
-    res.cookie("TOKEN", "", options);
-    res.send({ ok: 1 });
-})
 
 //=======================================================================
-//PER ULTIMO Controllo TOKEN
 //controllo su tutti i servizi (che incominciano on /api) se il TOKEN è scaduto o no
 app.use("/api", function (req: any, res, next) {
     //cookies è la collazione dei cookie, andiamo a prendere il cookie che si chiama TOKEN
@@ -190,7 +238,14 @@ app.use("/api", function (req: any, res, next) {
     }
 });
 
-
+//3. Logout
+app.post("/api/logout", async function (req, res, next) {
+    const options = {
+        ...cookiesOptions, maxAge: -1
+    };
+    res.cookie("TOKEN", "", options);
+    res.send({ ok: 1 });
+})
 //E. gestione delle risorse dinamiche
 
 app.get("/api/mails", async function (req: any, res, next) {
@@ -284,5 +339,12 @@ function createToken(data: any) {
     const token = jwt.sign(payload, jwtKey);
     console.log("Creato nuovo token: ", token);
     return token;
+}
+
+function sendGmail(email: any, password: string) {
+    let message = fs.readFileSync("./message.html", "utf8");
+    message = message.replace("__user", email);
+    message = message.replace("__password", password);
+    const transporter = nodemailer.createTransport({ service: "gmail", auth: googleOAuth })
 }
 

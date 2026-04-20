@@ -7,6 +7,7 @@ import { DataStorageService } from './data-storage-service';
 })
 
 export class CommonService {
+
   public dataStorageService: DataStorageService = inject(DataStorageService)
   public mailList: any = [];
 
@@ -32,5 +33,9 @@ export class CommonService {
 
   doLogout() {
     return this.dataStorageService.InviaRichiesta("POST", "/logout")!
+  }
+
+  loginWithGoogle(googleToken: string): Observable<any> {
+    return this.dataStorageService.InviaRichiesta("POST", "/loginWithGoogle", { googleToken })!;
   }
 }

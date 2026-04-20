@@ -17,11 +17,10 @@ export class HeaderComponent {
     this.commonService.doLogout()?.subscribe({
       next: () => {
         alert("Sessione chiusa correttamente");
+        this.router.navigate(["login"]);
       },
       "error": (error: any) => {
         alert(error.status + " : " + error.error);
-      },
-      "complete": () => {
         this.router.navigate(["login"]);
       }
     })
